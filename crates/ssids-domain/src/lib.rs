@@ -6,6 +6,10 @@
 
 mod bssid;
 mod channel;
+mod ie;
+mod phy;
 
 pub use bssid::{Bssid, ParseBssidError};
 pub use channel::{Band, Channel};
+pub use ie::{Element, Elements};
+pub use phy::{ChannelSpan, ChannelWidth, Standard};
