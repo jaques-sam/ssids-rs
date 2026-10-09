@@ -1,11 +1,13 @@
 //! Linux scan backend speaking nl80211 over generic netlink.
 //!
 //! Reading the kernel's scan results needs no privileges. Triggering a fresh
-//! scan needs `CAP_NET_ADMIN`; without it the backend still works but reports
+//! scan needs `CAP_NET_ADMIN`, or else NetworkManager, which lets desktop
+//! users request scans. With neither, the backend still works but reports
 //! its scans as passive (results cached from scans the system ran itself).
 #![cfg(target_os = "linux")]
 
 mod netlink;
+mod networkmanager;
 
 use std::io;
 use std::sync::mpsc;
@@ -50,13 +52,20 @@ pub struct Interface {
 pub struct Nl80211 {
     socket: GenlSocket,
     family: u16,
+    /// System bus connection for the NetworkManager fallback trigger,
+    /// opened the first time nl80211 refuses to trigger.
+    network_manager: Option<zbus::blocking::Connection>,
 }
 
 impl Nl80211 {
     pub fn connect() -> io::Result<Self> {
         let mut socket = GenlSocket::connect()?;
         let family = socket.resolve_family("nl80211")?;
-        Ok(Self { socket, family })
+        Ok(Self {
+            socket,
+            family,
+            network_manager: None,
+        })
     }
 
     /// Wireless interfaces that have a network device (skips P2P devices).
@@ -121,26 +130,48 @@ impl Nl80211 {
         }
     }
 
-    /// One complete scan: trigger if permitted, optionally wait for the
-    /// radio to sweep, then read the results. A refused trigger downgrades
-    /// the scan to passive instead of failing it.
+    /// Asks NetworkManager to scan `interface`, (re)connecting to the system
+    /// bus as needed.
+    fn request_scan_via_network_manager(&mut self, interface: &Interface) -> zbus::Result<()> {
+        let bus = match &self.network_manager {
+            Some(bus) => bus,
+            None => self
+                .network_manager
+                .insert(zbus::blocking::Connection::system()?),
+        };
+        let result = networkmanager::request_scan(bus, &interface.name);
+        if result.is_err() {
+            self.network_manager = None;
+        }
+        result
+    }
+
+    /// One complete scan: trigger a sweep (directly, else through
+    /// NetworkManager), optionally wait for the radio, then read the results.
+    /// A sweep that cannot be triggered downgrades the scan to passive
+    /// instead of failing it.
     pub fn scan(&mut self, interface: &Interface, settle: Duration) -> io::Result<Scan> {
         let passive_reason = match self.trigger_scan(interface) {
-            Ok(()) => {
-                thread::sleep(settle);
-                None
-            }
-            // A scan is already running (ours or the system's): results are fresh anyway.
+            // EBUSY: a sweep is already running (ours or the system's), so results are fresh.
+            Ok(()) => None,
             Err(e) if e.kind() == io::ErrorKind::ResourceBusy => None,
-            Err(e) if e.kind() == io::ErrorKind::PermissionDenied => Some(
-                "showing results cached by the system: triggering scans needs CAP_NET_ADMIN \
-                 (e.g. sudo setcap cap_net_admin+ep <binary>)"
-                    .to_owned(),
-            ),
+            Err(e) if e.kind() == io::ErrorKind::PermissionDenied => self
+                .request_scan_via_network_manager(interface)
+                .err()
+                .map(|nm| {
+                    format!(
+                        "showing results cached by the system: triggering scans needs \
+                         CAP_NET_ADMIN (sudo setcap cap_net_admin+ep <binary>) or \
+                         NetworkManager ({nm})"
+                    )
+                }),
             Err(e) => Some(format!(
                 "showing cached results: could not trigger a scan: {e}"
             )),
         };
+        if passive_reason.is_none() {
+            thread::sleep(settle);
+        }
         Ok(Scan {
             observations: self.scan_results(interface)?,
             passive_reason,

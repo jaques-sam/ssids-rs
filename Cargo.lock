@@ -3208,6 +3208,7 @@ dependencies = [
  "netlink-sys",
  "ssids-app",
  "ssids-domain",
+ "zbus",
 ]
 
 [[package]]
