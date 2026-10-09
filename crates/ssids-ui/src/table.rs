@@ -107,8 +107,8 @@ fn cell(entry: &Entry, column: Column, now: Duration) -> RichText {
                 .collect();
             RichText::new(ciphers.join("+"))
         }
-        Column::Standard => RichText::new(match ap.standard.generation() {
-            Some(generation) => format!("{} (Wi-Fi {generation})", ap.standard),
+        Column::Standard => RichText::new(match ap.standard.wifi_name(ap.channel.band) {
+            Some(name) => format!("{} ({name})", ap.standard),
             None => ap.standard.to_string(),
         }),
         Column::Rate => RichText::new(

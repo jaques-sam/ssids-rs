@@ -220,14 +220,16 @@ impl Standard {
         }
     }
 
-    /// Wi-Fi Alliance generation number, for HT and later.
-    pub fn generation(self) -> Option<u8> {
+    /// Wi-Fi Alliance name, for HT and later. 802.11ax on 6 GHz is
+    /// marketed separately as Wi-Fi 6E.
+    pub fn wifi_name(self, band: Band) -> Option<&'static str> {
         match self {
             Self::B | Self::A | Self::G => None,
-            Self::N => Some(4),
-            Self::Ac => Some(5),
-            Self::Ax => Some(6),
-            Self::Be => Some(7),
+            Self::N => Some("Wi-Fi 4"),
+            Self::Ac => Some("Wi-Fi 5"),
+            Self::Ax if band == Band::Ghz6 => Some("Wi-Fi 6E"),
+            Self::Ax => Some("Wi-Fi 6"),
+            Self::Be => Some("Wi-Fi 7"),
         }
     }
 }
@@ -354,6 +356,14 @@ mod tests {
             Standard::detect(Band::Ghz2_4, &Elements::new(&[191, 0])),
             Standard::G
         );
+    }
+
+    #[test]
+    fn wifi_names() {
+        assert_eq!(Standard::G.wifi_name(Band::Ghz2_4), None);
+        assert_eq!(Standard::Ax.wifi_name(Band::Ghz5), Some("Wi-Fi 6"));
+        assert_eq!(Standard::Ax.wifi_name(Band::Ghz6), Some("Wi-Fi 6E"));
+        assert_eq!(Standard::Be.wifi_name(Band::Ghz6), Some("Wi-Fi 7"));
     }
 
     #[test]
