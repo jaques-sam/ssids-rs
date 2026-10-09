@@ -1,6 +1,6 @@
 [package]
 name = "ssids-cli"
-description = "Headless ssids: scan from the terminal and record scans for replay."
+description = "Headless ssids: scan from the terminal, record scans for replay, serve them to the browser UI."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
