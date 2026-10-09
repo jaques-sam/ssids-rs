@@ -59,7 +59,7 @@ mod native {
             ..Default::default()
         };
         let create = Box::new(|cc: &eframe::CreationContext<'_>| {
-            Ok(Box::new(SsidsApp::new(source, label, cc.storage)) as Box<dyn eframe::App>)
+            Ok(Box::new(SsidsApp::new(source, label, cc)) as Box<dyn eframe::App>)
         });
         match eframe::run_native("ssids", options, create) {
             Ok(()) => ExitCode::SUCCESS,
@@ -133,7 +133,7 @@ mod web {
                 ),
             };
             let create = Box::new(|cc: &eframe::CreationContext<'_>| {
-                Ok(Box::new(SsidsApp::new(source, label, cc.storage)) as Box<dyn eframe::App>)
+                Ok(Box::new(SsidsApp::new(source, label, cc)) as Box<dyn eframe::App>)
             });
             let started = eframe::WebRunner::new()
                 .start(canvas, eframe::WebOptions::default(), create)

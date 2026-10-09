@@ -32,6 +32,13 @@ impl Entry {
     pub fn heard_ago(&self, now: Duration) -> Duration {
         now.saturating_sub(self.listed_at) + self.age
     }
+
+    /// Whether this is the network the machine is connected to. A BSS that
+    /// dropped out of the scans keeps its last `associated` flag, which no
+    /// longer says anything, so only one still in range counts.
+    pub fn connected(&self) -> bool {
+        self.present && self.ap.associated
+    }
 }
 
 /// State of one scanning session. Time is passed in by the caller as an
@@ -273,6 +280,23 @@ mod tests {
             .samples()
             .len();
         assert_eq!(samples, 2, "the sample at t=0 aged out");
+    }
+
+    #[test]
+    fn connected_only_while_listed() {
+        let mut session = Session::new(secs(5));
+        let associated = Observation {
+            associated: true,
+            ..observation(1, -40.0, 0)
+        };
+        session.apply(secs(0), scan(vec![associated, observation(2, -70.0, 0)]));
+        let connected: Vec<bool> = session.entries().map(Entry::connected).collect();
+        assert_eq!(connected, [true, false]);
+        session.apply(secs(5), scan(vec![observation(2, -70.0, 0)]));
+        assert!(
+            session.entries().all(|e| !e.connected()),
+            "out of range, so its stale associated flag no longer counts"
+        );
     }
 
     #[test]

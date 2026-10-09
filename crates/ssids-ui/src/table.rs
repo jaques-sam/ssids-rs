@@ -7,12 +7,14 @@ use ssids_app::Entry;
 use ssids_domain::Bssid;
 
 use crate::colors::{self, Palette};
+use crate::fonts;
 use crate::rows::{Column, Sort, age};
 
 const ROW_HEIGHT: f32 = 20.0;
 
 /// The access point table. Header clicks re-sort; the first column toggles
-/// whether an AP is drawn in the graphs and shows its graph colour.
+/// whether an AP is drawn in the graphs and shows its graph colour. The
+/// connected network's row is highlighted and in bold.
 pub fn show(
     ui: &mut Ui,
     rows: &[&Entry],
@@ -48,6 +50,8 @@ pub fn show(
             body.rows(ROW_HEIGHT, rows.len(), |mut row| {
                 let entry = rows[row.index()];
                 let bssid = entry.ap.bssid;
+                let connected = entry.connected();
+                row.set_selected(connected);
                 row.col(|ui| {
                     let mut shown = !hidden.contains(&bssid);
                     let swatch = RichText::new("■").color(palette.of(bssid));
@@ -70,6 +74,10 @@ pub fn show(
                         if let Some(weak) = weak {
                             text = text.color(weak);
                         }
+                        // The BSSID keeps its monospace font, aligned with the rows above.
+                        if connected && column != Column::Bssid {
+                            text = fonts::bold(text);
+                        }
                         ui.label(text);
                     });
                 }
@@ -84,13 +92,10 @@ fn ui_weak_color(row: &egui_extras::TableRow<'_, '_>) -> Color32 {
 fn cell(entry: &Entry, column: Column, now: Duration) -> RichText {
     let ap = &entry.ap;
     match column {
-        Column::Ssid => {
-            let text = match &ap.ssid {
-                Some(ssid) => RichText::new(ssid),
-                None => RichText::new("<hidden>").italics(),
-            };
-            if ap.associated { text.strong() } else { text }
-        }
+        Column::Ssid => match &ap.ssid {
+            Some(ssid) => RichText::new(ssid),
+            None => RichText::new("<hidden>").italics(),
+        },
         Column::Bssid => RichText::new(ap.bssid.to_string()).monospace(),
         Column::Signal => match ap.signal_dbm {
             Some(dbm) => RichText::new(format!("{dbm:.0} dBm")).color(colors::signal(dbm)),

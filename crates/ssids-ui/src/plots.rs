@@ -1,23 +1,42 @@
 //! The graphs below the table. They plot the same rows the table shows,
-//! minus the APs the user unticked, in each AP's table colour.
+//! minus the APs the user unticked, in each AP's table colour. The connected
+//! network is drawn thicker and labelled in bold.
 
 use std::time::Duration;
 
-use eframe::egui::{Align2, Stroke, Ui};
+use eframe::egui::{Align2, RichText, Stroke, TextStyle, Ui};
 use egui_plot::{Corner, GridMark, Legend, Line, Plot, PlotPoint, Polygon, Text};
 use ssids_app::{Entry, RETENTION};
 use ssids_domain::{Band, Channel, SignalHistory};
 
 use crate::colors::Palette;
+use crate::fonts;
 
 /// Signal scale shared by the graphs: from the noise floor to a strong AP.
 pub const FLOOR_DBM: f64 = -100.0;
 const CEILING_DBM: f64 = -20.0;
 
+fn ssid(entry: &Entry) -> &str {
+    entry.ap.ssid.as_deref().unwrap_or("<hidden>")
+}
+
 /// Legend/hover name; includes the BSSID because SSIDs repeat across APs.
 pub fn label(entry: &Entry) -> String {
-    let ssid = entry.ap.ssid.as_deref().unwrap_or("<hidden>");
-    format!("{ssid} ({})", entry.ap.bssid)
+    format!("{} ({})", ssid(entry), entry.ap.bssid)
+}
+
+fn line_width(entry: &Entry) -> f32 {
+    if entry.connected() { 3.5 } else { 1.5 }
+}
+
+/// The SSID written next to an AP's line or outline.
+fn caption(entry: &Entry) -> RichText {
+    let text = RichText::new(ssid(entry));
+    if entry.connected() {
+        fonts::bold(text.text_style(TextStyle::Body))
+    } else {
+        text
+    }
 }
 
 /// Samples as `[seconds relative to now, dBm]` points.
@@ -41,11 +60,23 @@ pub fn signal_history(ui: &mut Ui, rows: &[&Entry], palette: &Palette, now: Dura
         .include_y(CEILING_DBM)
         .show(ui, |plot| {
             for entry in rows {
+                let color = palette.of(entry.ap.bssid);
+                let name = label(entry);
                 let points = history_points(&entry.history, now);
+                // Only the connected network is named on the graph: labels on
+                // every line would bury the lines, and the legend has them all.
+                if let Some(&[x, dbm]) = points.last().filter(|_| entry.connected()) {
+                    let end = PlotPoint::new(x, dbm + 1.0);
+                    plot.text(
+                        Text::new(&name, end, caption(entry))
+                            .color(color)
+                            .anchor(Align2::RIGHT_BOTTOM),
+                    );
+                }
                 plot.line(
-                    Line::new(label(entry), points)
-                        .color(palette.of(entry.ap.bssid))
-                        .width(1.5),
+                    Line::new(name, points)
+                        .color(color)
+                        .width(line_width(entry)),
                 );
             }
         });
@@ -134,13 +165,12 @@ pub fn channel_usage(ui: &mut Ui, band: Band, rows: &[&Entry], palette: &Palette
                     plot.polygon(
                         Polygon::new(&name, outline(segment, dbm))
                             .fill_color(color.gamma_multiply(0.15))
-                            .stroke(Stroke::new(1.5, color)),
+                            .stroke(Stroke::new(line_width(entry), color)),
                     );
                 }
-                let ssid = entry.ap.ssid.as_deref().unwrap_or("<hidden>");
                 let top = PlotPoint::new(entry.ap.span.center_mhz, dbm + 1.0);
                 plot.text(
-                    Text::new(&name, top, ssid)
+                    Text::new(&name, top, caption(entry))
                         .color(color)
                         .anchor(Align2::CENTER_BOTTOM),
                 );

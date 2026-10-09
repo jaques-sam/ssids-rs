@@ -4,6 +4,7 @@
 //! (the native `main`, the web entry point) decide which backend feeds it.
 
 mod colors;
+mod fonts;
 mod plots;
 mod rows;
 mod table;
@@ -84,13 +85,15 @@ pub struct SsidsApp {
 }
 
 impl SsidsApp {
-    /// `storage` (from eframe's creation context) restores saved settings.
+    /// Restores saved settings from the creation context's storage.
     pub fn new(
         source: Box<dyn ScanSource>,
         source_label: impl Into<String>,
-        storage: Option<&dyn eframe::Storage>,
+        cc: &eframe::CreationContext<'_>,
     ) -> Self {
-        let settings: Settings = storage
+        fonts::install(&cc.egui_ctx);
+        let settings: Settings = cc
+            .storage
             .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
             .unwrap_or_default();
         Self {

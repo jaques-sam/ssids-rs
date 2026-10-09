@@ -7,17 +7,22 @@ native app on Linux and, via WebAssembly, in any modern browser.
 
 ![ssids showing the synthetic demo: access point table and 2.4 GHz channel graph](docs/screenshot.png)
 
+This app was built with the help of Claude Sonnet 5.5 & Opus 5.5.
+
 ## What it shows
 
 Per access point: SSID (hidden networks marked), BSSID, signal, channel and
 band, channel width (20–320 MHz, 80+80), security (Open, WEP, WPA, WPA2,
 WPA3, OWE, Personal/Enterprise) and ciphers, 802.11 standard / Wi-Fi
 generation (including 6E and 7), highest legacy rate, vendor (IEEE OUI
-registry) and how long ago it was heard. The connected network is in bold.
+registry) and how long ago it was heard. The connected network stands out:
+its row is highlighted and bold, and the graphs draw it thicker with a bold
+label.
 
 Graphs: signal over the last five minutes, and per band an outline of each
 AP over the spectrum it really occupies, so overlapping wide channels are
 visible at a glance.
+
 
 ## Running it
 
@@ -29,6 +34,7 @@ cargo run --release -p ssids-cli -- scan   # one scan as a table (or --json)
 
 Options: `ssids-gui --interface wlan1`, `--replay FILE`, `--agent URL`;
 `ssids record -o FILE` records scans for `--replay`.
+
 
 ### Scanning and privileges
 
@@ -44,6 +50,7 @@ be *triggered*, which ssids tries in this order:
    scans by itself.
 
 ssids never needs to run as root and does not use `iw`/`iwlist`.
+
 
 ### In the browser
 
@@ -64,6 +71,7 @@ loopback only and accepts browser pages only from allowed origins
 `http://localhost:8080`, i.e. `trunk serve`). Native clients such as
 `ssids-gui --agent` send no origin and are accepted. Settings (interval,
 filters, sort, graph) are remembered between runs in both builds.
+
 
 ## Architecture
 
@@ -98,6 +106,7 @@ ssids-domain: Observation → AccessPoint (IE parser, channels, widths,
 Adding another platform means adding one adapter that produces
 `Observation`s; nothing else changes.
 
+
 ## Development
 
 ```sh
@@ -109,6 +118,7 @@ scripts/make-demo-recording.py      # regenerate the synthetic demo
 
 Rust 1.95 or newer. The test fixture `crates/ssids-domain/fixtures/*.hex`
 is a real beacon captured with `ssids scan --json`.
+
 
 ## Not (yet) implemented
 
