@@ -1,0 +1,16 @@
+[package]
+name = "ssids-adapter-nl80211"
+description = "Linux ScanSource talking nl80211 (generic netlink) directly; no iw/iwlist needed."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+ssids-app = { workspace = true }
+ssids-domain = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+netlink-sys = { version = "0.9", default-features = false }
