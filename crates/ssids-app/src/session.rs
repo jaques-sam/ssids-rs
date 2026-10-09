@@ -5,8 +5,8 @@ use ssids_domain::{AccessPoint, Bssid, Observation, SignalHistory};
 
 use crate::{ScanError, ScanReply, ScanSource};
 
-/// How long an access point (and its signal history) is remembered after it
-/// was last heard.
+/// How long an access point is remembered after scans stop listing it, and
+/// how much signal history is kept.
 pub const RETENTION: Duration = Duration::from_secs(300);
 
 /// Requests faster than this only load the radio without adding information.
@@ -17,10 +17,21 @@ const MIN_INTERVAL: Duration = Duration::from_secs(1);
 pub struct Entry {
     pub ap: AccessPoint,
     pub history: SignalHistory,
-    /// When the BSS was last heard, on the session clock.
-    pub last_seen: Duration,
+    /// Session time of the latest scan that listed the BSS.
+    pub listed_at: Duration,
+    /// How long before `listed_at` the backend had last heard it. Cached
+    /// results can be minutes old, i.e. from before the session started,
+    /// which a session timestamp could not express.
+    pub age: Duration,
     /// Whether the most recent successful scan still listed it.
     pub present: bool,
+}
+
+impl Entry {
+    /// How long ago the BSS was last heard.
+    pub fn heard_ago(&self, now: Duration) -> Duration {
+        now.saturating_sub(self.listed_at) + self.age
+    }
 }
 
 /// State of one scanning session. Time is passed in by the caller as an
@@ -91,22 +102,29 @@ impl Session {
                 continue;
             };
             let age = Duration::from_millis(observation.seen_ms_ago.unwrap_or(0).into());
-            let heard = now.saturating_sub(age);
             let entry = self.entries.entry(ap.bssid).or_insert_with(|| Entry {
                 ap: ap.clone(),
                 history: SignalHistory::default(),
-                last_seen: heard,
+                listed_at: now,
+                age,
                 present: true,
             });
             if let Some(dbm) = observation.signal_dbm {
-                entry.history.record(heard, dbm);
+                // Before session start the plot has no time axis, so pin to 0;
+                // the history still dedupes repeats of that cached beacon.
+                entry.history.record(now.saturating_sub(age), dbm);
             }
             entry.ap = ap;
+            entry.listed_at = now;
+            entry.age = age;
             entry.present = true;
-            entry.last_seen = entry.last_seen.max(heard);
         }
+        // Retention counts from when scans stopped listing a BSS, not from
+        // when it was heard: a listed BSS is never dropped, however stale
+        // the backend's cache entry for it is.
+        self.entries
+            .retain(|_, entry| now.saturating_sub(entry.listed_at) <= RETENTION);
         let cutoff = now.saturating_sub(RETENTION);
-        self.entries.retain(|_, entry| entry.last_seen >= cutoff);
         for entry in self.entries.values_mut() {
             entry.history.forget_before(cutoff);
         }
@@ -201,8 +219,29 @@ mod tests {
         let mut session = Session::new(secs(5));
         session.apply(secs(10), scan(vec![observation(1, -40.0, 3_000)]));
         let entry = session.entries().next().expect("one AP");
-        assert_eq!(entry.last_seen, secs(7));
+        assert_eq!(entry.heard_ago(secs(10)), secs(3));
+        assert_eq!(entry.heard_ago(secs(12)), secs(5));
         assert_eq!(entry.history.latest(), Some((secs(7), -40.0)));
+    }
+
+    #[test]
+    fn listed_ap_with_stale_cache_entry_is_kept_and_aged_correctly() {
+        // Some drivers keep the associated BSS's cache entry minutes old.
+        let mut session = Session::new(secs(5));
+        session.apply(secs(1), scan(vec![observation(1, -40.0, 200_000)]));
+        let later = RETENTION + secs(60);
+        let age_then = u32::try_from((later + secs(199)).as_millis()).expect("fits");
+        session.apply(later, scan(vec![observation(1, -40.0, age_then)]));
+        let entry = session
+            .entries()
+            .next()
+            .expect("still listed, so still shown");
+        assert_eq!(entry.heard_ago(later), later + secs(199));
+        assert_eq!(
+            entry.history.samples().len(),
+            0,
+            "its only measurement predates the history window"
+        );
     }
 
     #[test]

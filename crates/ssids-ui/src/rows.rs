@@ -82,7 +82,10 @@ impl Column {
             Self::Standard => a.standard.cmp(&b.standard),
             Self::Rate => missing_last(a.max_rate_mbps, b.max_rate_mbps, f32::total_cmp),
             Self::Vendor => missing_last(a.vendor, b.vendor, Ord::cmp),
-            Self::LastSeen => eb.last_seen.cmp(&ea.last_seen), // most recent first
+            // Most recently heard first; same `now` for both, so any instant works.
+            Self::LastSeen => ea
+                .heard_ago(Duration::ZERO)
+                .cmp(&eb.heard_ago(Duration::ZERO)),
         }
     }
 }
@@ -184,8 +187,8 @@ pub fn visible<'a>(
 }
 
 /// "3 s", "2 min" style age for the Last seen column.
-pub fn age(now: Duration, then: Duration) -> String {
-    let secs = now.saturating_sub(then).as_secs();
+pub fn age(ago: Duration) -> String {
+    let secs = ago.as_secs();
     if secs < 60 {
         format!("{secs} s")
     } else {
@@ -221,7 +224,8 @@ mod tests {
         Entry {
             ap: AccessPoint::from_observation(&observation).expect("valid channel"),
             history: SignalHistory::default(),
-            last_seen: Duration::from_secs(u64::from(last_octet)),
+            listed_at: Duration::ZERO,
+            age: Duration::from_secs(u64::from(last_octet)),
             present,
         }
     }
@@ -301,8 +305,7 @@ mod tests {
     #[test]
     fn ages() {
         let s = Duration::from_secs;
-        assert_eq!(age(s(10), s(7)), "3 s");
-        assert_eq!(age(s(200), s(10)), "3 min");
-        assert_eq!(age(s(1), s(5)), "0 s", "clock skew never panics");
+        assert_eq!(age(s(3)), "3 s");
+        assert_eq!(age(s(190)), "3 min");
     }
 }

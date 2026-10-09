@@ -118,6 +118,6 @@ fn cell(entry: &Entry, column: Column, now: Duration) -> RichText {
                 .unwrap_or_default(),
         ),
         Column::Vendor => RichText::new(ap.vendor.unwrap_or("")),
-        Column::LastSeen => RichText::new(age(now, entry.last_seen)),
+        Column::LastSeen => RichText::new(age(entry.heard_ago(now))),
     }
 }
