@@ -58,8 +58,10 @@ mod native {
                 .with_inner_size([1200.0, 760.0]),
             ..Default::default()
         };
-        let app = SsidsApp::new(source, label);
-        match eframe::run_native("ssids", options, Box::new(|_| Ok(Box::new(app)))) {
+        let create = Box::new(|cc: &eframe::CreationContext<'_>| {
+            Ok(Box::new(SsidsApp::new(source, label, cc.storage)) as Box<dyn eframe::App>)
+        });
+        match eframe::run_native("ssids", options, create) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("ssids-gui: {error}");
@@ -130,13 +132,11 @@ mod web {
                     "synthetic demo · for live data run `ssids serve` and add ?agent=ws://127.0.0.1:7878".into(),
                 ),
             };
-            let app = SsidsApp::new(source, label);
+            let create = Box::new(|cc: &eframe::CreationContext<'_>| {
+                Ok(Box::new(SsidsApp::new(source, label, cc.storage)) as Box<dyn eframe::App>)
+            });
             let started = eframe::WebRunner::new()
-                .start(
-                    canvas,
-                    eframe::WebOptions::default(),
-                    Box::new(|_| Ok(Box::new(app))),
-                )
+                .start(canvas, eframe::WebOptions::default(), create)
                 .await;
             match started {
                 Ok(()) => {

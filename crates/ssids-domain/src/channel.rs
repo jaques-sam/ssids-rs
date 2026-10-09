@@ -1,7 +1,9 @@
 use std::fmt;
 
 /// Frequency band. Channel numbers are only unique within a band.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum Band {
     Ghz2_4,
     Ghz5,

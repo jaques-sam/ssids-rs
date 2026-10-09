@@ -4,10 +4,11 @@
 use std::cmp::Ordering;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
 use ssids_app::Entry;
 use ssids_domain::Band;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Column {
     Ssid,
     Bssid,
@@ -99,7 +100,7 @@ fn missing_last<T>(a: Option<T>, b: Option<T>, cmp: impl Fn(&T, &T) -> Ordering)
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sort {
     pub column: Column,
     pub descending: bool,
@@ -128,7 +129,7 @@ impl Sort {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Filter {
     /// Case-insensitive substring of SSID, BSSID or vendor.
     pub text: String,

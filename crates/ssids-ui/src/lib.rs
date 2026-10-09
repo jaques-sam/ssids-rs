@@ -12,6 +12,7 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use eframe::egui::{self, RichText, Ui};
+use serde::{Deserialize, Serialize};
 use ssids_app::{Entry, ScanSource, Session};
 use ssids_domain::{Band, Bssid};
 
@@ -21,7 +22,7 @@ use crate::rows::{Filter, Sort};
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Which graph the bottom panel shows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 enum Graph {
     SignalHistory,
     Channels(Band),
@@ -43,6 +44,29 @@ impl Graph {
     }
 }
 
+/// What the user set up, restored on the next start (a file natively,
+/// localStorage on the web). Missing or unreadable values fall back to the
+/// defaults, so old or corrupted settings can never prevent startup.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct Settings {
+    interval_secs: u64,
+    filter: Filter,
+    sort: Sort,
+    graph: Graph,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            interval_secs: DEFAULT_INTERVAL.as_secs(),
+            filter: Filter::default(),
+            sort: Sort::default(),
+            graph: Graph::SignalHistory,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SsidsApp {
     session: Session,
@@ -60,16 +84,24 @@ pub struct SsidsApp {
 }
 
 impl SsidsApp {
-    pub fn new(source: Box<dyn ScanSource>, source_label: impl Into<String>) -> Self {
+    /// `storage` (from eframe's creation context) restores saved settings.
+    pub fn new(
+        source: Box<dyn ScanSource>,
+        source_label: impl Into<String>,
+        storage: Option<&dyn eframe::Storage>,
+    ) -> Self {
+        let settings: Settings = storage
+            .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
+            .unwrap_or_default();
         Self {
-            session: Session::new(DEFAULT_INTERVAL),
+            session: Session::new(Duration::from_secs(settings.interval_secs)),
             source,
             source_label: source_label.into(),
-            filter: Filter::default(),
-            sort: Sort::default(),
+            filter: settings.filter,
+            sort: settings.sort,
             hidden: BTreeSet::new(),
             palette: Palette::default(),
-            graph: Graph::SignalHistory,
+            graph: settings.graph,
             now: Duration::ZERO,
         }
     }
@@ -119,6 +151,16 @@ impl SsidsApp {
 }
 
 impl eframe::App for SsidsApp {
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        let settings = Settings {
+            interval_secs: self.session.interval().as_secs(),
+            filter: self.filter.clone(),
+            sort: self.sort,
+            graph: self.graph,
+        };
+        eframe::set_value(storage, eframe::APP_KEY, &settings);
+    }
+
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.now = Duration::from_secs_f64(ctx.input(|i| i.time));
         if self.session.tick(self.now, self.source.as_mut()) {
@@ -167,5 +209,20 @@ impl eframe::App for SsidsApp {
                 self.now,
             );
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn partial_or_outdated_settings_fall_back_to_defaults() {
+        let settings: Settings =
+            serde_json::from_str(r#"{"interval_secs": 9, "removed_option": true}"#)
+                .expect("tolerant");
+        assert_eq!(settings.interval_secs, 9);
+        assert_eq!(settings.sort, Sort::default());
+        assert_eq!(settings.graph, Graph::SignalHistory);
     }
 }

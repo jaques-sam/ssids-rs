@@ -13,12 +13,13 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
-eframe = "0.36"
+eframe = { version = "0.36", features = ["persistence"] }
 egui_extras = { version = "0.36", default-features = false }
 egui_plot = "0.37"
 ssids-adapter-remote = { workspace = true }
 ssids-adapter-replay = { workspace = true }
 ssids-app = { workspace = true }
+serde = { workspace = true }
 ssids-domain = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -31,3 +32,6 @@ clap = { version = "4.6", features = ["derive"] }
 log = "0.4"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["Location", "Url", "UrlSearchParams"] }
+
+[dev-dependencies]
+serde_json = { workspace = true }
