@@ -1,0 +1,13 @@
+[package]
+name = "ssids-app"
+description = "Application layer: the ScanSource port and the scanning session the UI renders. I/O-free, wasm-safe."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+ssids-domain = { workspace = true }
