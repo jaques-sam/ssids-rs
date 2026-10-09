@@ -33,7 +33,7 @@ pub type ScanReply = Result<Scan, ScanError>;
 ///
 /// Both methods must return immediately: the session drives sources from
 /// the UI thread, which in the browser is the only thread there is.
-pub trait ScanSource {
+pub trait ScanSource: fmt::Debug {
     /// Asks for a fresh scan. Ignored if one is already in flight.
     fn request(&mut self);
 

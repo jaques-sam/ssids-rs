@@ -1,0 +1,26 @@
+[package]
+name = "ssids-ui"
+description = "The ssids graphical interface (egui): native and WebAssembly."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "ssids-gui"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+eframe = "0.36"
+egui_extras = { version = "0.36", default-features = false }
+ssids-adapter-replay = { workspace = true }
+ssids-app = { workspace = true }
+ssids-domain = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ssids-adapter-nl80211 = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clap = { version = "4.6", features = ["derive"] }

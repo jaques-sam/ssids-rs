@@ -5,13 +5,14 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.95"
 
 [workspace.dependencies]
 ssids-domain = { path = "crates/ssids-domain" }
 ssids-app = { path = "crates/ssids-app" }
 ssids-adapter-replay = { path = "crates/ssids-adapter-replay" }
 ssids-adapter-nl80211 = { path = "crates/ssids-adapter-nl80211" }
+ssids-ui = { path = "crates/ssids-ui" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

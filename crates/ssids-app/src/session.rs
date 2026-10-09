@@ -135,7 +135,7 @@ mod tests {
     use super::*;
     use crate::Scan;
 
-    #[derive(Default)]
+    #[derive(Debug, Default)]
     struct FakeSource {
         requests: usize,
         replies: VecDeque<ScanReply>,
