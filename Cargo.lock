@@ -3106,6 +3106,7 @@ dependencies = [
  "ssids-adapter-replay",
  "ssids-app",
  "ssids-domain",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

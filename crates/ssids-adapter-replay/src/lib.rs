@@ -7,8 +7,8 @@ use std::fmt;
 
 use ssids_app::{Scan, ScanReply, ScanSource};
 
-/// The synthetic neighbourhood used by the browser demo and UI development.
-pub const DEMO_RECORDING: &str = include_str!("../recordings/demo.jsonl");
+/// The synthetic neighbourhood shown by [`ReplaySource::demo`].
+const DEMO_RECORDING: &str = include_str!("../recordings/demo.jsonl");
 
 #[derive(Debug)]
 pub struct ReplaySource {
@@ -18,6 +18,12 @@ pub struct ReplaySource {
 }
 
 impl ReplaySource {
+    /// The bundled synthetic neighbourhood (see `scripts/make-demo-recording.py`),
+    /// for the browser and for trying the UI without Wi-Fi hardware.
+    pub fn demo() -> Self {
+        Self::from_jsonl(DEMO_RECORDING).expect("bundled demo recording is valid (tested)")
+    }
+
     pub fn from_jsonl(recording: &str) -> Result<Self, RecordingError> {
         let scans = recording
             .lines()
@@ -110,7 +116,7 @@ mod tests {
 
     #[test]
     fn demo_recording_is_valid_and_varied() {
-        let source = ReplaySource::from_jsonl(DEMO_RECORDING).expect("demo parses");
+        let source = ReplaySource::demo();
         assert!(source.scans.len() >= 30);
         let aps: std::collections::BTreeSet<_> = source
             .scans
