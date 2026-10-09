@@ -15,6 +15,7 @@ workspace = true
 [dependencies]
 eframe = "0.36"
 egui_extras = { version = "0.36", default-features = false }
+egui_plot = "0.37"
 ssids-adapter-replay = { workspace = true }
 ssids-app = { workspace = true }
 ssids-domain = { workspace = true }

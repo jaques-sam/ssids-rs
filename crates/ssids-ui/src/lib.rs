@@ -4,6 +4,7 @@
 //! (the native `main`, the web entry point) decide which backend feeds it.
 
 mod colors;
+mod plots;
 mod rows;
 mod table;
 
@@ -11,12 +12,29 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use eframe::egui::{self, RichText, Ui};
-use ssids_app::{ScanSource, Session};
+use ssids_app::{Entry, ScanSource, Session};
 use ssids_domain::Bssid;
 
+use crate::colors::Palette;
 use crate::rows::{Filter, Sort};
 
 const DEFAULT_INTERVAL: Duration = Duration::from_secs(5);
+
+/// Which graph the bottom panel shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Graph {
+    SignalHistory,
+}
+
+impl Graph {
+    const ALL: [Self; 1] = [Self::SignalHistory];
+
+    fn title(self) -> String {
+        match self {
+            Self::SignalHistory => "Signal over time".into(),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct SsidsApp {
@@ -28,6 +46,8 @@ pub struct SsidsApp {
     sort: Sort,
     /// APs the user excluded from the graphs.
     hidden: BTreeSet<Bssid>,
+    palette: Palette,
+    graph: Graph,
     /// Session clock: time since the app started.
     now: Duration,
 }
@@ -41,6 +61,8 @@ impl SsidsApp {
             filter: Filter::default(),
             sort: Sort::default(),
             hidden: BTreeSet::new(),
+            palette: Palette::default(),
+            graph: Graph::SignalHistory,
             now: Duration::ZERO,
         }
     }
@@ -92,7 +114,11 @@ impl SsidsApp {
 impl eframe::App for SsidsApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.now = Duration::from_secs_f64(ctx.input(|i| i.time));
-        self.session.tick(self.now, self.source.as_mut());
+        if self.session.tick(self.now, self.source.as_mut()) {
+            for entry in self.session.entries() {
+                self.palette.assign(entry.ap.bssid);
+            }
+        }
         // Keep ticking while idle so scans continue without user input.
         ctx.request_repaint_after(Duration::from_millis(250));
     }
@@ -100,9 +126,36 @@ impl eframe::App for SsidsApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         egui::Panel::top("toolbar").show(ui, |ui| self.toolbar(ui));
         egui::Panel::bottom("status").show(ui, |ui| self.status(ui));
+        let rows = rows::visible(self.session.entries(), &self.filter, self.sort);
+        egui::Panel::bottom("graphs")
+            .resizable(true)
+            .default_size(320.0)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    for graph in Graph::ALL {
+                        ui.selectable_value(&mut self.graph, graph, graph.title());
+                    }
+                });
+                let plotted: Vec<&Entry> = rows
+                    .iter()
+                    .copied()
+                    .filter(|e| !self.hidden.contains(&e.ap.bssid))
+                    .collect();
+                match self.graph {
+                    Graph::SignalHistory => {
+                        plots::signal_history(ui, &plotted, &self.palette, self.now)
+                    }
+                }
+            });
         egui::CentralPanel::default().show(ui, |ui| {
-            let rows = rows::visible(self.session.entries(), &self.filter, self.sort);
-            table::show(ui, &rows, &mut self.sort, &mut self.hidden, self.now);
+            table::show(
+                ui,
+                &rows,
+                &self.palette,
+                &mut self.sort,
+                &mut self.hidden,
+                self.now,
+            );
         });
     }
 }

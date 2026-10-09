@@ -6,7 +6,7 @@ use egui_extras::{Column as Width, TableBuilder};
 use ssids_app::Entry;
 use ssids_domain::Bssid;
 
-use crate::colors;
+use crate::colors::{self, Palette};
 use crate::rows::{Column, Sort, age};
 
 const ROW_HEIGHT: f32 = 20.0;
@@ -16,6 +16,7 @@ const ROW_HEIGHT: f32 = 20.0;
 pub fn show(
     ui: &mut Ui,
     rows: &[&Entry],
+    palette: &Palette,
     sort: &mut Sort,
     hidden: &mut BTreeSet<Bssid>,
     now: Duration,
@@ -49,7 +50,7 @@ pub fn show(
                 let bssid = entry.ap.bssid;
                 row.col(|ui| {
                     let mut shown = !hidden.contains(&bssid);
-                    let swatch = RichText::new("■").color(colors::of(bssid));
+                    let swatch = RichText::new("■").color(palette.of(bssid));
                     if ui
                         .checkbox(&mut shown, swatch)
                         .on_hover_text("Show in graphs")
