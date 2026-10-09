@@ -177,20 +177,17 @@ pub struct LiveSource {
 }
 
 impl LiveSource {
-    /// Scans `interface`, or the first wireless interface when `None`. The
-    /// interface is looked up on every scan, so unplugging and replugging a
-    /// USB adapter recovers by itself.
+    /// Scans `interface`, or the first wireless interface when `None`.
     pub fn spawn(interface: Option<String>) -> io::Result<Self> {
         let (requests, request_rx) = mpsc::channel::<()>();
         let (reply_tx, replies) = mpsc::channel();
         thread::Builder::new()
             .name("nl80211-scan".into())
             .spawn(move || {
-                let mut connection = None;
+                let mut scanner = Scanner::new(interface);
                 // Ends when the LiveSource (and with it the sender) is dropped.
                 for () in request_rx {
-                    let reply = scan_once(&mut connection, interface.as_deref());
-                    if reply_tx.send(reply).is_err() {
+                    if reply_tx.send(scanner.scan()).is_err() {
                         break;
                     }
                 }
@@ -203,22 +200,41 @@ impl LiveSource {
     }
 }
 
-/// One scan on a lazily (re)established connection. Results reflect the
-/// sweep triggered by the previous request: waiting here would only delay
-/// the reply, while the session asks again one interval later anyway.
-fn scan_once(connection: &mut Option<Nl80211>, interface: Option<&str>) -> ScanReply {
-    let result = (|| {
-        let nl = match connection {
-            Some(nl) => nl,
-            None => connection.insert(Nl80211::connect()?),
-        };
-        let interface = nl.interface(interface)?;
-        nl.scan(&interface, Duration::ZERO)
-    })();
-    result.map_err(|e| {
-        *connection = None; // reconnect next time rather than reuse a broken socket
-        ScanError(format!("nl80211: {e}"))
-    })
+/// Blocking scans of one interface over a lazily (re)established
+/// connection; shared by [`LiveSource`]'s worker and the `ssids serve` agent.
+#[derive(Debug)]
+pub struct Scanner {
+    interface: Option<String>,
+    connection: Option<Nl80211>,
+}
+
+impl Scanner {
+    /// Scans `interface`, or the first wireless interface when `None`.
+    pub fn new(interface: Option<String>) -> Self {
+        Self {
+            interface,
+            connection: None,
+        }
+    }
+
+    /// One scan. Results reflect the sweep triggered by the previous call:
+    /// waiting for it here would only delay the reply, while callers poll
+    /// again one interval later anyway.
+    pub fn scan(&mut self) -> ScanReply {
+        let result = (|| {
+            let nl = match &mut self.connection {
+                Some(nl) => nl,
+                None => self.connection.insert(Nl80211::connect()?),
+            };
+            // Looked up every time so a replugged USB adapter is found again.
+            let interface = nl.interface(self.interface.as_deref())?;
+            nl.scan(&interface, Duration::ZERO)
+        })();
+        result.map_err(|e| {
+            self.connection = None; // reconnect next time rather than reuse a broken socket
+            ScanError(format!("nl80211: {e}"))
+        })
+    }
 }
 
 impl ScanSource for LiveSource {

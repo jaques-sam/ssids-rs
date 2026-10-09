@@ -18,3 +18,8 @@ serde_json = { workspace = true }
 ssids-adapter-nl80211 = { workspace = true }
 ssids-app = { workspace = true }
 ssids-domain = { workspace = true }
+# 0.24 is what ewebsock (the remote client) uses: one WebSocket stack in the tree.
+tungstenite = "0.24"
+
+[dev-dependencies]
+ssids-adapter-remote = { workspace = true }

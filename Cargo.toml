@@ -12,6 +12,7 @@ ssids-domain = { path = "crates/ssids-domain" }
 ssids-app = { path = "crates/ssids-app" }
 ssids-adapter-replay = { path = "crates/ssids-adapter-replay" }
 ssids-adapter-nl80211 = { path = "crates/ssids-adapter-nl80211" }
+ssids-adapter-remote = { path = "crates/ssids-adapter-remote" }
 ssids-ui = { path = "crates/ssids-ui" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -16,6 +16,7 @@ workspace = true
 eframe = "0.36"
 egui_extras = { version = "0.36", default-features = false }
 egui_plot = "0.37"
+ssids-adapter-remote = { workspace = true }
 ssids-adapter-replay = { workspace = true }
 ssids-app = { workspace = true }
 ssids-domain = { workspace = true }
@@ -27,4 +28,6 @@ ssids-adapter-nl80211 = { workspace = true }
 clap = { version = "4.6", features = ["derive"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+log = "0.4"
 wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Location", "Url", "UrlSearchParams"] }

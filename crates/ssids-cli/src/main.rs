@@ -1,16 +1,19 @@
 //! `ssids`: Wi-Fi scanning from the terminal.
 
+mod serve;
 mod table;
 
+use std::error::Error;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::net::{SocketAddr, TcpListener};
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use ssids_adapter_nl80211::Nl80211;
+use ssids_adapter_nl80211::{Interface, Nl80211};
 use ssids_app::Scan;
 use ssids_domain::AccessPoint;
 
@@ -51,6 +54,18 @@ enum Command {
         #[arg(long, default_value_t = 5)]
         interval: u64,
     },
+    /// Serve scans over WebSocket, so the browser UI can show live data.
+    Serve {
+        /// Address to listen on. Keep it on loopback: scan results reveal
+        /// where this machine is.
+        #[arg(long, default_value = "127.0.0.1:7878")]
+        listen: SocketAddr,
+
+        /// Web page origin allowed to connect; repeat for several. Native
+        /// clients send no origin and are always accepted.
+        #[arg(long = "allow-origin", default_values = ["http://127.0.0.1:8080", "http://localhost:8080"])]
+        allowed_origins: Vec<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -64,50 +79,70 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(cli: Cli) -> io::Result<()> {
-    let mut nl = Nl80211::connect()?;
-    let interface = nl.interface(cli.interface.as_deref())?;
+fn run(cli: Cli) -> Result<(), Box<dyn Error>> {
+    let interface = cli.interface;
     match cli.command {
-        Command::Scan { json, settle } => {
-            let scan = nl.scan(&interface, Duration::from_secs(settle))?;
-            warn_if_passive(&scan);
-            let mut stdout = io::stdout().lock();
-            if json {
-                writeln!(stdout, "{}", serde_json::to_string(&scan)?)
-            } else {
-                let aps: Vec<AccessPoint> = scan
-                    .observations
-                    .iter()
-                    .filter_map(AccessPoint::from_observation)
-                    .collect();
-                stdout.write_all(table::render(&aps).as_bytes())
-            }
-        }
+        Command::Scan { json, settle } => scan(interface, json, Duration::from_secs(settle)),
         Command::Record {
             output,
             count,
             interval,
-        } => {
-            let mut file = OpenOptions::new().create(true).append(true).open(&output)?;
-            let interval = Duration::from_secs(interval);
-            for n in 1..=count {
-                if n > 1 {
-                    // Also lets the sweep triggered by the previous scan complete.
-                    thread::sleep(interval);
-                }
-                let scan = nl.scan(&interface, Duration::ZERO)?;
-                if n == 1 {
-                    warn_if_passive(&scan);
-                }
-                writeln!(file, "{}", serde_json::to_string(&scan)?)?;
-                eprintln!(
-                    "recorded scan {n}/{count}: {} BSSs",
-                    scan.observations.len()
-                );
-            }
-            Ok(())
-        }
+        } => record(interface, &output, count, Duration::from_secs(interval)),
+        Command::Serve {
+            listen,
+            allowed_origins,
+        } => serve::serve(TcpListener::bind(listen)?, interface, allowed_origins),
     }
+}
+
+fn connect(interface: Option<String>) -> io::Result<(Nl80211, Interface)> {
+    let mut nl = Nl80211::connect()?;
+    let interface = nl.interface(interface.as_deref())?;
+    Ok((nl, interface))
+}
+
+fn scan(interface: Option<String>, json: bool, settle: Duration) -> Result<(), Box<dyn Error>> {
+    let (mut nl, interface) = connect(interface)?;
+    let scan = nl.scan(&interface, settle)?;
+    warn_if_passive(&scan);
+    let mut stdout = io::stdout().lock();
+    if json {
+        writeln!(stdout, "{}", serde_json::to_string(&scan)?)?;
+    } else {
+        let aps: Vec<AccessPoint> = scan
+            .observations
+            .iter()
+            .filter_map(AccessPoint::from_observation)
+            .collect();
+        stdout.write_all(table::render(&aps).as_bytes())?;
+    }
+    Ok(())
+}
+
+fn record(
+    interface: Option<String>,
+    output: &Path,
+    count: u32,
+    interval: Duration,
+) -> Result<(), Box<dyn Error>> {
+    let (mut nl, interface) = connect(interface)?;
+    let mut file = OpenOptions::new().create(true).append(true).open(output)?;
+    for n in 1..=count {
+        if n > 1 {
+            // Also lets the sweep triggered by the previous scan complete.
+            thread::sleep(interval);
+        }
+        let scan = nl.scan(&interface, Duration::ZERO)?;
+        if n == 1 {
+            warn_if_passive(&scan);
+        }
+        writeln!(file, "{}", serde_json::to_string(&scan)?)?;
+        eprintln!(
+            "recorded scan {n}/{count}: {} BSSs",
+            scan.observations.len()
+        );
+    }
+    Ok(())
 }
 
 fn warn_if_passive(scan: &Scan) {

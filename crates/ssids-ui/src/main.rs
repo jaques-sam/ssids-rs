@@ -16,6 +16,7 @@ mod native {
     use std::process::ExitCode;
 
     use clap::Parser;
+    use ssids_adapter_remote::RemoteSource;
     use ssids_adapter_replay::ReplaySource;
     use ssids_app::ScanSource;
     use ssids_ui::SsidsApp;
@@ -24,8 +25,12 @@ mod native {
     #[command(version, about = "Graphical Wi-Fi scanner")]
     struct Args {
         /// Wireless interface to scan (default: the first one found).
-        #[arg(short, long, conflicts_with_all = ["replay", "demo"])]
+        #[arg(short, long, conflicts_with_all = ["agent", "replay", "demo"])]
         interface: Option<String>,
+
+        /// Show scans from an `ssids serve` agent, e.g. ws://192.0.2.7:7878.
+        #[arg(long, conflicts_with_all = ["replay", "demo"])]
+        agent: Option<String>,
 
         /// Replay a recording made with `ssids record` instead of scanning.
         #[arg(long, conflicts_with = "demo")]
@@ -64,6 +69,10 @@ mod native {
     }
 
     fn pick_source(args: Args) -> Result<Source, Box<dyn std::error::Error>> {
+        if let Some(url) = args.agent {
+            let label = format!("agent {url}");
+            return Ok((Box::new(RemoteSource::new(url)), label));
+        }
         if let Some(path) = args.replay {
             let recording = std::fs::read_to_string(&path)?;
             let label = format!("replay of {}", path.display());
@@ -96,24 +105,32 @@ mod native {
     }
 }
 
-/// Browser entry point. Browsers cannot scan Wi-Fi, so the page shows the
+/// Browser entry point. Browsers cannot scan Wi-Fi: with `?agent=<ws url>`
+/// the page shows live scans from an `ssids serve` agent, otherwise the
 /// bundled demo.
 #[cfg(target_arch = "wasm32")]
 mod web {
     use eframe::wasm_bindgen::JsCast as _;
-    use eframe::web_sys;
+    use ssids_adapter_remote::RemoteSource;
     use ssids_adapter_replay::ReplaySource;
+    use ssids_app::ScanSource;
     use ssids_ui::SsidsApp;
 
     pub fn main() {
+        // Routes `log` records (e.g. WebSocket errors) to the browser console.
+        let _ = eframe::WebLogger::init(log::LevelFilter::Warn);
         wasm_bindgen_futures::spawn_local(async {
             let Some(canvas) = element("ssids").and_then(|e| e.dyn_into().ok()) else {
                 return set_status("ssids: page has no <canvas id=\"ssids\">");
             };
-            let app = SsidsApp::new(
-                Box::new(ReplaySource::demo()),
-                "synthetic demo · browsers cannot scan Wi-Fi",
-            );
+            let (source, label): (Box<dyn ScanSource>, String) = match agent_url() {
+                Some(url) => (Box::new(RemoteSource::new(url.clone())), format!("agent {url}")),
+                None => (
+                    Box::new(ReplaySource::demo()),
+                    "synthetic demo · for live data run `ssids serve` and add ?agent=ws://127.0.0.1:7878".into(),
+                ),
+            };
+            let app = SsidsApp::new(source, label);
             let started = eframe::WebRunner::new()
                 .start(
                     canvas,
@@ -130,6 +147,11 @@ mod web {
                 Err(error) => set_status(&format!("ssids failed to start: {error:?}")),
             }
         });
+    }
+
+    fn agent_url() -> Option<String> {
+        let href = web_sys::window()?.location().href().ok()?;
+        web_sys::Url::new(&href).ok()?.search_params().get("agent")
     }
 
     fn element(id: &str) -> Option<web_sys::Element> {

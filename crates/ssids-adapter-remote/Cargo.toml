@@ -1,0 +1,14 @@
+[package]
+name = "ssids-adapter-remote"
+description = "ScanSource reading from an `ssids serve` agent over WebSocket; works natively and in the browser."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+ewebsock = "0.8"
+serde_json = { workspace = true }
+ssids-app = { workspace = true }
