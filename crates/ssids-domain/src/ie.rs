@@ -7,10 +7,12 @@ pub(crate) mod id {
     pub const SSID: u8 = 0;
     pub const SUPPORTED_RATES: u8 = 1;
     pub const HT_CAPABILITIES: u8 = 45;
+    pub const RSN: u8 = 48;
     pub const EXTENDED_SUPPORTED_RATES: u8 = 50;
     pub const HT_OPERATION: u8 = 61;
     pub const VHT_CAPABILITIES: u8 = 191;
     pub const VHT_OPERATION: u8 = 192;
+    pub const VENDOR_SPECIFIC: u8 = 221;
     pub const EXTENSION: u8 = 255;
 }
 

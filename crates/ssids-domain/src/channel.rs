@@ -48,13 +48,13 @@ impl Channel {
     pub fn from_freq(mhz: u32) -> Option<Self> {
         let (band, number) = match mhz {
             2484 => (Band::Ghz2_4, 14),
-            2412..=2472 if (mhz - 2407) % 5 == 0 => (Band::Ghz2_4, (mhz - 2407) / 5),
+            2412..=2472 if (mhz - 2407).is_multiple_of(5) => (Band::Ghz2_4, (mhz - 2407) / 5),
             // 4.9 GHz public-safety / Japan channels, numbered from 4000 MHz.
-            4910..=4980 if mhz % 5 == 0 => (Band::Ghz5, (mhz - 4000) / 5),
-            5150..=5895 if mhz % 5 == 0 => (Band::Ghz5, (mhz - 5000) / 5),
+            4910..=4980 if mhz.is_multiple_of(5) => (Band::Ghz5, (mhz - 4000) / 5),
+            5150..=5895 if mhz.is_multiple_of(5) => (Band::Ghz5, (mhz - 5000) / 5),
             5935 => (Band::Ghz6, 2),
             // 6 GHz primary channels sit on a 20 MHz grid (1, 5, 9, ...).
-            5955..=7115 if (mhz - 5955) % 20 == 0 => (Band::Ghz6, (mhz - 5950) / 5),
+            5955..=7115 if (mhz - 5955).is_multiple_of(20) => (Band::Ghz6, (mhz - 5950) / 5),
             _ => return None,
         };
         Some(Self {
