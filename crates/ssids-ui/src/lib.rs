@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use eframe::egui::{self, RichText, Ui};
 use ssids_app::{Entry, ScanSource, Session};
-use ssids_domain::Bssid;
+use ssids_domain::{Band, Bssid};
 
 use crate::colors::Palette;
 use crate::rows::{Filter, Sort};
@@ -24,14 +24,21 @@ const DEFAULT_INTERVAL: Duration = Duration::from_secs(5);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Graph {
     SignalHistory,
+    Channels(Band),
 }
 
 impl Graph {
-    const ALL: [Self; 1] = [Self::SignalHistory];
+    const ALL: [Self; 4] = [
+        Self::SignalHistory,
+        Self::Channels(Band::Ghz2_4),
+        Self::Channels(Band::Ghz5),
+        Self::Channels(Band::Ghz6),
+    ];
 
     fn title(self) -> String {
         match self {
             Self::SignalHistory => "Signal over time".into(),
+            Self::Channels(band) => format!("{band} channels"),
         }
     }
 }
@@ -144,6 +151,9 @@ impl eframe::App for SsidsApp {
                 match self.graph {
                     Graph::SignalHistory => {
                         plots::signal_history(ui, &plotted, &self.palette, self.now)
+                    }
+                    Graph::Channels(band) => {
+                        plots::channel_usage(ui, band, &plotted, &self.palette)
                     }
                 }
             });
