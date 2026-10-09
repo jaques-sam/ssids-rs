@@ -1,0 +1,9 @@
+[package]
+name = "ssids-domain"
+description = "Wi-Fi domain model: access points, channels, information elements. Pure, I/O-free, wasm-safe."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
