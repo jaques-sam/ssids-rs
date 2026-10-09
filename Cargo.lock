@@ -76,6 +76,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ssids-adapter-replay"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "ssids-app",
+ "ssids-domain",
+]
+
+[[package]]
 name = "ssids-app"
 version = "0.1.0"
 dependencies = [

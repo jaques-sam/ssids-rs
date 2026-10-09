@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Crates that must stay free of native-only code so the UI can ship as WebAssembly.
-WASM_CRATES=(ssids-domain ssids-app)
+WASM_CRATES=(ssids-domain ssids-app ssids-adapter-replay)
 
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings

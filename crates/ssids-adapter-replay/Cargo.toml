@@ -1,0 +1,16 @@
+[package]
+name = "ssids-adapter-replay"
+description = "ScanSource that replays recorded scans: for tests, UI development and the browser demo."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json = { workspace = true }
+ssids-app = { workspace = true }
+
+[dev-dependencies]
+ssids-domain = { workspace = true }
